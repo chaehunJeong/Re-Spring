@@ -199,7 +199,7 @@ async function loadModels() {
     await tf.setBackend('webgl');
     await tf.ready();
 
-    // MoveNet 모델 로드 (체형 분석용) - tfjs 런타임 사용
+    // MoveNet 모델 로드 (체형 분석용)
     poseDetector = await poseDetection.createDetector(
         poseDetection.SupportedModels.MoveNet,
         {
@@ -207,8 +207,7 @@ async function loadModels() {
         }
     );
 
-    // FaceMesh 모델 로드 (퍼스널 컬러 분석용) - tfjs 런타임 사용
-    console.log('FaceMesh 모델 로딩 시작...');
+    // FaceMesh 모델 로드 (퍼스널 컬러 분석용)
     faceMeshDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
         {
@@ -217,7 +216,6 @@ async function loadModels() {
             maxFaces: 1
         }
     );
-    console.log('FaceMesh 모델 로드 완료:', faceMeshDetector);
 
     console.log('모든 모델 로드 완료');
 }
@@ -363,7 +361,6 @@ async function detectFace() {
 
         // FaceMesh 모델이 정상적으로 로드되었는지 확인
         if (!faceMeshDetector) {
-            console.error('FaceMesh 모델이 로드되지 않았습니다.');
             drawFlippedText('얼굴 인식 모델 로딩 중...', canvas.width / 2, 30, {
                 font: '16px sans-serif',
                 fillStyle: 'rgba(255, 100, 100, 0.9)'
@@ -372,9 +369,15 @@ async function detectFace() {
             return;
         }
 
-        const faces = await faceMeshDetector.estimateFaces(video, {
-            flipHorizontal: false
-        });
+        // 비디오 프레임을 임시 캔버스에 그린 후 감지
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0);
+
+        const faces = await faceMeshDetector.estimateFaces(tempCanvas);
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (faces.length > 0) {
@@ -638,7 +641,14 @@ async function analyzeColor() {
     colorAnalyzeBtn.innerHTML = '분석 중...';
 
     try {
-        const faces = await faceMeshDetector.estimateFaces(video);
+        // 비디오 프레임을 임시 캔버스에 그린 후 감지
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0);
+
+        const faces = await faceMeshDetector.estimateFaces(tempCanvas);
 
         if (faces.length > 0) {
             savedColorResult = analyzePersonalColor(faces[0]);
@@ -875,10 +885,12 @@ function analyzePersonalColor(face) {
     const allIndices = [...cheekIndices, ...foreheadIndices];
     let totalR = 0, totalG = 0, totalB = 0;
     let sampleCount = 0;
+    let validPoints = 0;
 
     allIndices.forEach(index => {
         const point = keypoints[index];
         if (point) {
+            validPoints++;
             const x = Math.round(point.x);
             const y = Math.round(point.y);
 
@@ -909,25 +921,22 @@ function analyzePersonalColor(face) {
     const avgG = totalG / sampleCount;
     const avgB = totalB / sampleCount;
 
-    // RGB to HSV 변환
-    const hsv = rgbToHsv(avgR, avgG, avgB);
-
-    // RGB to Lab 변환 (더 정확한 색상 분석)
+    // RGB to Lab 변환 (색상 분석)
     const lab = rgbToLab(avgR, avgG, avgB);
 
     // 4계절 퍼스널 컬러 판별
-    const seasonResult = determineSeasonalColor(hsv, lab, avgR, avgG, avgB);
+    const seasonResult = determineSeasonalColor(lab);
 
     return seasonResult;
 }
 
-function determineSeasonalColor(hsv, lab, r, g, b) {
+function determineSeasonalColor(lab) {
     // lab.b: 노란색(웜) vs 파란색(쿨) 수치
     // lab.l: 밝기(명도)
-    
+
     // 한국인 피부 기준 수치 보정 (보통 13~15 사이가 경계선)
-    const isWarm = lab.b > 14.5; 
-    const isLight = lab.l > 62; 
+    const isWarm = lab.b > 14.5;
+    const isLight = lab.l > 62;
 
     let colorKey = '';
     if (isWarm) {
