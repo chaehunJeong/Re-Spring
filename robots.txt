@@ -1,0 +1,29 @@
+# AI 스타일 코치 - robots.txt
+# https://re-spring.pages.dev
+
+# 모든 크롤러 허용
+User-agent: *
+Allow: /
+Crawl-delay: 1
+
+# Google
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+# Naver
+User-agent: Yeti
+Allow: /
+
+# Bing
+User-agent: Bingbot
+Allow: /
+
+# Daum
+User-agent: Daum
+Allow: /
+
+# 사이트맵 위치
+Sitemap: https://re-spring.pages.dev/sitemap.xml
