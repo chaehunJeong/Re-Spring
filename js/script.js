@@ -182,22 +182,19 @@ async function loadModels() {
     await tf.setBackend('webgl');
     await tf.ready();
 
-    // BlazePose 모델 로드 (체형 분석용)
+    // MoveNet 모델 로드 (체형 분석용) - tfjs 런타임 사용
     poseDetector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.BlazePose,
+        poseDetection.SupportedModels.MoveNet,
         {
-            runtime: 'mediapipe',
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/pose',
-            modelType: 'full'
+            modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER
         }
     );
 
-    // FaceMesh 모델 로드 (퍼스널 컬러 분석용)
+    // FaceMesh 모델 로드 (퍼스널 컬러 분석용) - tfjs 런타임 사용
     faceMeshDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
         {
-            runtime: 'mediapipe',
-            solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh',
+            runtime: 'tfjs',
             refineLandmarks: true
         }
     );
@@ -274,15 +271,15 @@ async function detectPose() {
 function drawPose(pose) {
     const keypoints = pose.keypoints;
 
-    // 연결선 정의 (BlazePose)
+    // 연결선 정의 (MoveNet)
     const connections = [
-        [11, 12], // 어깨
-        [11, 13], [13, 15], // 왼팔
-        [12, 14], [14, 16], // 오른팔
-        [11, 23], [12, 24], // 몸통
-        [23, 24], // 골반
-        [23, 25], [25, 27], // 왼다리
-        [24, 26], [26, 28]  // 오른다리
+        [5, 6],   // 어깨
+        [5, 7], [7, 9],   // 왼팔
+        [6, 8], [8, 10],  // 오른팔
+        [5, 11], [6, 12], // 몸통
+        [11, 12], // 골반
+        [11, 13], [13, 15], // 왼다리
+        [12, 14], [14, 16]  // 오른다리
     ];
 
     // 연결선 그리기
@@ -357,13 +354,14 @@ async function analyze() {
 function analyzeBodyType(pose) {
     const keypoints = pose.keypoints;
 
-    // 주요 포인트 추출
-    const leftShoulder = keypoints[11];
-    const rightShoulder = keypoints[12];
-    const leftHip = keypoints[23];
-    const rightHip = keypoints[24];
-    const leftKnee = keypoints[25];
-    const rightKnee = keypoints[26];
+    // MoveNet keypoint 인덱스
+    // 5: left_shoulder, 6: right_shoulder
+    // 11: left_hip, 12: right_hip
+    // 13: left_knee, 14: right_knee
+    const leftShoulder = keypoints[5];
+    const rightShoulder = keypoints[6];
+    const leftHip = keypoints[11];
+    const rightHip = keypoints[12];
 
     // 신뢰도 체크
     const minScore = 0.5;
