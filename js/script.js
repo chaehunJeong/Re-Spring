@@ -931,21 +931,73 @@ function analyzePersonalColor(face) {
 }
 
 function determineSeasonalColor(lab) {
-    // lab.b: 노란색(웜) vs 파란색(쿨) 수치
-    // lab.l: 밝기(명도)
+    // ==========================================
+    // 1. ITA (Individual Typology Angle) 계산
+    // 피부과학에서 사용하는 피부 밝기 분류 공식
+    // ==========================================
+    const ita = Math.atan2(lab.l - 50, lab.b) * (180 / Math.PI);
 
-    // 한국인 피부 기준 수치 보정 (보통 13~15 사이가 경계선)
-    const isWarm = lab.b > 14.5;
-    const isLight = lab.l > 62;
+    // ITA 기반 밝기 분류
+    // > 55°: 매우 밝음, 41~55°: 밝음, 28~41°: 중간, 10~28°: 어두움, < 10°: 매우 어두움
+    const isLight = ita > 35; // 한국인 기준 조정
 
+    // ==========================================
+    // 2. 웜/쿨 판별 (Lab a, b 값 조합)
+    // a: 빨강(+) vs 초록(-), b: 노랑(+) vs 파랑(-)
+    // ==========================================
+    // 웜톤: 노란기(b+)와 붉은기(a+)가 강함
+    // 쿨톤: 파란기(b-)와 분홍기가 강함
+    const warmScore = (lab.b * 0.7) + (lab.a * 0.3); // 웜톤 점수
+    const isWarm = warmScore > 12; // 한국인 피부 기준 조정
+
+    // ==========================================
+    // 3. 채도(Chroma) 계산 - 선명함/뮤트함 판별
+    // ==========================================
+    const chroma = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const isClear = chroma > 18; // 채도가 높으면 선명(Clear), 낮으면 뮤트(Muted)
+
+    // ==========================================
+    // 4. 4계절 퍼스널 컬러 판별
+    // 봄: 밝고 선명한 웜톤
+    // 여름: 밝고 뮤트한 쿨톤
+    // 가을: 어둡고 뮤트한 웜톤
+    // 겨울: 어둡고 선명한 쿨톤
+    // ==========================================
     let colorKey = '';
+
     if (isWarm) {
-        colorKey = isLight ? 'spring_warm' : 'autumn_warm';
+        if (isLight && isClear) {
+            colorKey = 'spring_warm'; // 밝고 선명한 웜톤
+        } else if (isLight && !isClear) {
+            colorKey = 'spring_warm'; // 밝고 뮤트한 웜톤도 봄으로 (라이트 스프링)
+        } else if (!isLight && !isClear) {
+            colorKey = 'autumn_warm'; // 어둡고 뮤트한 웜톤
+        } else {
+            colorKey = 'autumn_warm'; // 어둡고 선명한 웜톤도 가을로 (딥 오텀)
+        }
     } else {
-        colorKey = isLight ? 'summer_cool' : 'winter_cool';
+        if (isLight && !isClear) {
+            colorKey = 'summer_cool'; // 밝고 뮤트한 쿨톤
+        } else if (isLight && isClear) {
+            colorKey = 'summer_cool'; // 밝고 선명한 쿨톤도 여름으로 (브라이트 썸머)
+        } else if (!isLight && isClear) {
+            colorKey = 'winter_cool'; // 어둡고 선명한 쿨톤
+        } else {
+            colorKey = 'winter_cool'; // 어둡고 뮤트한 쿨톤도 겨울로 (딥 윈터)
+        }
     }
 
     const colorData = STYLE_DATABASE.personalColors[colorKey];
+
+    // 디버그 정보 (콘솔에서 확인 가능)
+    console.log('퍼스널 컬러 분석:', {
+        ITA: ita.toFixed(1) + '°',
+        웜톤점수: warmScore.toFixed(1),
+        채도: chroma.toFixed(1),
+        판정: { isLight, isWarm, isClear },
+        결과: colorData.name
+    });
+
     return { type: colorData.name, key: colorKey };
 }
 
