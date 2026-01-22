@@ -37,6 +37,10 @@ let poseDetectionCount = 0;
 const AUTO_ANALYZE_THRESHOLD = 30; // 약 1초 (30프레임) 동안 안정적으로 감지되면 자동 분석
 let isAutoAnalyzing = false;
 
+// 카메라 전환 관련 변수
+const switchCameraBtn = document.getElementById('switch-camera-btn');
+let currentFacingMode = 'user'; // 'user' = 전면, 'environment' = 후면
+
 // ==========================================
 // 스타일 추천 데이터베이스
 // ==========================================
@@ -230,11 +234,16 @@ async function startCamera() {
             video: {
                 width: { ideal: 640 },
                 height: { ideal: 480 },
-                facingMode: 'user'
+                facingMode: currentFacingMode
             }
         });
 
         video.srcObject = stream;
+
+        // 모바일 기기인 경우 카메라 전환 버튼 표시
+        if (isMobileDevice() && switchCameraBtn) {
+            switchCameraBtn.classList.remove('hidden');
+        }
 
         // 비디오가 재생 가능한 상태가 되면 시작
        video.onloadedmetadata = async () => {
@@ -291,6 +300,66 @@ function stopCamera() {
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 카메라 전환 버튼 숨기기
+    if (switchCameraBtn) {
+        switchCameraBtn.classList.add('hidden');
+    }
+}
+
+// 모바일 기기 감지
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// 카메라 전환 (전면 ↔ 후면)
+async function switchCamera() {
+    // 현재 스트림 중지
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+
+    // facingMode 전환
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+    // 버튼 텍스트 업데이트
+    if (switchCameraBtn) {
+        switchCameraBtn.textContent = currentFacingMode === 'user' ? '📷 후면 카메라' : '📷 전면 카메라';
+    }
+
+    // 새 카메라로 스트림 시작
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 },
+                facingMode: currentFacingMode
+            }
+        });
+
+        video.srcObject = stream;
+
+        video.onloadedmetadata = async () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            try {
+                await video.play();
+            } catch (playError) {
+                console.error('비디오 재생 실패:', playError);
+            }
+
+            // 감지 재시작
+            if (isStreaming) {
+                startDetection();
+            }
+        };
+    } catch (error) {
+        console.error('카메라 전환 실패:', error);
+        alert('카메라 전환에 실패했습니다.');
+        // 원래 카메라로 복구
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    }
 }
 
 // 단계 UI 업데이트
@@ -1195,6 +1264,11 @@ startBtn.addEventListener('click', () => {
         startCamera();
     }
 });
+
+// 카메라 전환 버튼
+if (switchCameraBtn) {
+    switchCameraBtn.addEventListener('click', switchCamera);
+}
 
 // 단계별 분석 버튼
 if (colorAnalyzeBtn) {
