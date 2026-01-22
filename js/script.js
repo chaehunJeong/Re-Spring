@@ -208,15 +208,18 @@ async function loadModels() {
     );
 
     // FaceMesh 모델 로드 (퍼스널 컬러 분석용) - tfjs 런타임 사용
+    console.log('FaceMesh 모델 로딩 시작...');
     faceMeshDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
         {
             runtime: 'tfjs',
-            refineLandmarks: true
+            refineLandmarks: true,
+            maxFaces: 1
         }
     );
+    console.log('FaceMesh 모델 로드 완료:', faceMeshDetector);
 
-    console.log('모델 로드 완료');
+    console.log('모든 모델 로드 완료');
 }
 
 // ==========================================
@@ -356,6 +359,17 @@ async function detectFace() {
             return;
         }
 
+        // FaceMesh 모델이 정상적으로 로드되었는지 확인
+        if (!faceMeshDetector) {
+            console.error('FaceMesh 모델이 로드되지 않았습니다.');
+            drawFlippedText('얼굴 인식 모델 로딩 중...', canvas.width / 2, 30, {
+                font: '16px sans-serif',
+                fillStyle: 'rgba(255, 100, 100, 0.9)'
+            });
+            animationId = requestAnimationFrame(detectFace);
+            return;
+        }
+
         const faces = await faceMeshDetector.estimateFaces(video, {
             flipHorizontal: false
         });
@@ -368,22 +382,15 @@ async function detectFace() {
             if (analysisStep === 0 && !isAutoAnalyzing) {
                 faceDetectionCount++;
 
-                // 진행 상황 표시
+                // 진행 상황 표시 (반전 텍스트)
                 const progress = Math.min(100, Math.round((faceDetectionCount / AUTO_ANALYZE_THRESHOLD) * 100));
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(`퍼스널 컬러 분석 준비 중... ${progress}%`, canvas.width / 2, 30);
+                drawFlippedText(`퍼스널 컬러 분석 준비 중... ${progress}%`, canvas.width / 2, 30, {
+                    font: 'bold 14px sans-serif',
+                    fillStyle: 'rgba(255, 255, 255, 0.9)'
+                });
 
-                // 진행바 그리기
-                const barWidth = 200;
-                const barHeight = 6;
-                const barX = (canvas.width - barWidth) / 2;
-                const barY = 40;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.fillRect(barX, barY, barWidth, barHeight);
-                ctx.fillStyle = '#f093fb';
-                ctx.fillRect(barX, barY, barWidth * (progress / 100), barHeight);
+                // 진행바 그리기 (반전)
+                drawFlippedProgressBar(progress, 40, '#f093fb');
 
                 if (faceDetectionCount >= AUTO_ANALYZE_THRESHOLD) {
                     isAutoAnalyzing = true;
@@ -396,11 +403,11 @@ async function detectFace() {
             // 얼굴이 감지되지 않으면 카운트 리셋
             faceDetectionCount = 0;
 
-            // 얼굴이 감지되지 않을 때 안내 텍스트 표시
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.font = '16px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('얼굴을 카메라에 맞춰주세요', canvas.width / 2, 30);
+            // 얼굴이 감지되지 않을 때 안내 텍스트 표시 (반전)
+            drawFlippedText('얼굴을 카메라에 맞춰주세요', canvas.width / 2, 30, {
+                font: '16px sans-serif',
+                fillStyle: 'rgba(255, 255, 255, 0.8)'
+            });
         }
     } catch (error) {
         console.error('얼굴 감지 오류:', error);
@@ -476,6 +483,40 @@ function drawOutline(keypoints, indices) {
     ctx.stroke();
 }
 
+// 캔버스가 CSS로 반전되어 있으므로 텍스트를 다시 반전시켜 정상으로 보이게 함
+function drawFlippedText(text, x, y, options = {}) {
+    ctx.save();
+    // 텍스트 위치에서 반전
+    ctx.translate(x, y);
+    ctx.scale(-1, 1);
+    ctx.fillStyle = options.fillStyle || 'rgba(255, 255, 255, 0.9)';
+    ctx.font = options.font || '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+}
+
+// 진행바도 반전해서 그리기
+function drawFlippedProgressBar(progress, y, color) {
+    const barWidth = 200;
+    const barHeight = 6;
+    const barX = canvas.width / 2;
+
+    ctx.save();
+    ctx.translate(barX, y);
+    ctx.scale(-1, 1);
+
+    // 배경
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.fillRect(-barWidth / 2, 0, barWidth, barHeight);
+
+    // 진행바
+    ctx.fillStyle = color;
+    ctx.fillRect(-barWidth / 2, 0, barWidth * (progress / 100), barHeight);
+
+    ctx.restore();
+}
+
 // ==========================================
 // 실시간 포즈 감지 및 시각화 (2단계: 체형 분석)
 // ==========================================
@@ -511,22 +552,15 @@ async function detectPose() {
             if (analysisStep === 1 && !isAutoAnalyzing && hasValidPose) {
                 poseDetectionCount++;
 
-                // 진행 상황 표시
+                // 진행 상황 표시 (반전 텍스트)
                 const progress = Math.min(100, Math.round((poseDetectionCount / AUTO_ANALYZE_THRESHOLD) * 100));
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(`체형 분석 준비 중... ${progress}%`, canvas.width / 2, 30);
+                drawFlippedText(`체형 분석 준비 중... ${progress}%`, canvas.width / 2, 30, {
+                    font: 'bold 14px sans-serif',
+                    fillStyle: 'rgba(255, 255, 255, 0.9)'
+                });
 
-                // 진행바 그리기
-                const barWidth = 200;
-                const barHeight = 6;
-                const barX = (canvas.width - barWidth) / 2;
-                const barY = 40;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.fillRect(barX, barY, barWidth, barHeight);
-                ctx.fillStyle = '#667eea';
-                ctx.fillRect(barX, barY, barWidth * (progress / 100), barHeight);
+                // 진행바 그리기 (반전)
+                drawFlippedProgressBar(progress, 40, '#667eea');
 
                 if (poseDetectionCount >= AUTO_ANALYZE_THRESHOLD) {
                     isAutoAnalyzing = true;
@@ -536,20 +570,20 @@ async function detectPose() {
                 }
             } else if (!hasValidPose) {
                 poseDetectionCount = 0;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.font = '16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('전신이 더 잘 보이도록 뒤로 물러나주세요', canvas.width / 2, 30);
+                drawFlippedText('전신이 더 잘 보이도록 뒤로 물러나주세요', canvas.width / 2, 30, {
+                    font: '16px sans-serif',
+                    fillStyle: 'rgba(255, 255, 255, 0.8)'
+                });
             }
         } else {
             // 포즈가 감지되지 않으면 카운트 리셋
             poseDetectionCount = 0;
 
-            // 포즈가 감지되지 않을 때 안내 텍스트 표시
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.font = '16px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('전신이 보이도록 서주세요', canvas.width / 2, 30);
+            // 포즈가 감지되지 않을 때 안내 텍스트 표시 (반전)
+            drawFlippedText('전신이 보이도록 서주세요', canvas.width / 2, 30, {
+                font: '16px sans-serif',
+                fillStyle: 'rgba(255, 255, 255, 0.8)'
+            });
         }
     } catch (error) {
         console.error('포즈 감지 오류:', error);
