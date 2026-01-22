@@ -31,6 +31,12 @@ let savedColorResult = null;
 let savedBodyResult = null;
 let analysisStep = 0; // 0: 시작 전, 1: 퍼스널 컬러 완료, 2: 체형 완료
 
+// 자동 분석을 위한 변수
+let faceDetectionCount = 0;
+let poseDetectionCount = 0;
+const AUTO_ANALYZE_THRESHOLD = 30; // 약 1초 (30프레임) 동안 안정적으로 감지되면 자동 분석
+let isAutoAnalyzing = false;
+
 // ==========================================
 // 스타일 추천 데이터베이스
 // ==========================================
@@ -229,9 +235,18 @@ async function startCamera() {
 
         video.srcObject = stream;
 
-        video.onloadedmetadata = () => {
+        // 비디오가 재생 가능한 상태가 되면 시작
+        video.onloadedmetadata = async () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+
+            // 비디오 재생 시작
+            try {
+                await video.play();
+            } catch (playError) {
+                console.error('비디오 재생 실패:', playError);
+            }
+
             isStreaming = true;
             startBtn.textContent = '카메라 중지';
 
@@ -242,8 +257,10 @@ async function startCamera() {
                 updateStepUI();
             }
 
-            // 단계에 따라 다른 감지 시작
-            startDetection();
+            // 약간의 지연 후 감지 시작 (모델 준비 시간)
+            setTimeout(() => {
+                startDetection();
+            }, 500);
         };
     } catch (error) {
         console.error('카메라 접근 실패:', error);
@@ -333,11 +350,57 @@ async function detectFace() {
     if (!isStreaming) return;
 
     try {
-        const faces = await faceMeshDetector.estimateFaces(video);
+        // 비디오가 준비되었는지 확인
+        if (video.readyState < 2) {
+            animationId = requestAnimationFrame(detectFace);
+            return;
+        }
+
+        const faces = await faceMeshDetector.estimateFaces(video, {
+            flipHorizontal: false
+        });
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (faces.length > 0) {
             drawFace(faces[0]);
+
+            // 자동 분석: 얼굴이 안정적으로 감지되면 자동 분석
+            if (analysisStep === 0 && !isAutoAnalyzing) {
+                faceDetectionCount++;
+
+                // 진행 상황 표시
+                const progress = Math.min(100, Math.round((faceDetectionCount / AUTO_ANALYZE_THRESHOLD) * 100));
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`퍼스널 컬러 분석 준비 중... ${progress}%`, canvas.width / 2, 30);
+
+                // 진행바 그리기
+                const barWidth = 200;
+                const barHeight = 6;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = 40;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = '#f093fb';
+                ctx.fillRect(barX, barY, barWidth * (progress / 100), barHeight);
+
+                if (faceDetectionCount >= AUTO_ANALYZE_THRESHOLD) {
+                    isAutoAnalyzing = true;
+                    faceDetectionCount = 0;
+                    // 자동으로 퍼스널 컬러 분석 실행
+                    analyzeColor();
+                }
+            }
+        } else {
+            // 얼굴이 감지되지 않으면 카운트 리셋
+            faceDetectionCount = 0;
+
+            // 얼굴이 감지되지 않을 때 안내 텍스트 표시
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('얼굴을 카메라에 맞춰주세요', canvas.width / 2, 30);
         }
     } catch (error) {
         console.error('얼굴 감지 오류:', error);
@@ -421,11 +484,72 @@ async function detectPose() {
     if (!isStreaming) return;
 
     try {
+        // 비디오가 준비되었는지 확인
+        if (video.readyState < 2) {
+            animationId = requestAnimationFrame(detectPose);
+            return;
+        }
+
         const poses = await poseDetector.estimatePoses(video);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (poses.length > 0) {
-            drawPose(poses[0]);
+            const pose = poses[0];
+            drawPose(pose);
+
+            // 체형 분석에 필요한 키포인트가 충분히 감지되었는지 확인
+            const keypoints = pose.keypoints;
+            const leftShoulder = keypoints[5];
+            const rightShoulder = keypoints[6];
+            const leftHip = keypoints[11];
+            const rightHip = keypoints[12];
+
+            const hasValidPose = leftShoulder.score > 0.5 && rightShoulder.score > 0.5 &&
+                                leftHip.score > 0.5 && rightHip.score > 0.5;
+
+            // 자동 분석: 포즈가 안정적으로 감지되면 자동 분석
+            if (analysisStep === 1 && !isAutoAnalyzing && hasValidPose) {
+                poseDetectionCount++;
+
+                // 진행 상황 표시
+                const progress = Math.min(100, Math.round((poseDetectionCount / AUTO_ANALYZE_THRESHOLD) * 100));
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`체형 분석 준비 중... ${progress}%`, canvas.width / 2, 30);
+
+                // 진행바 그리기
+                const barWidth = 200;
+                const barHeight = 6;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = 40;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                ctx.fillStyle = '#667eea';
+                ctx.fillRect(barX, barY, barWidth * (progress / 100), barHeight);
+
+                if (poseDetectionCount >= AUTO_ANALYZE_THRESHOLD) {
+                    isAutoAnalyzing = true;
+                    poseDetectionCount = 0;
+                    // 자동으로 체형 분석 실행
+                    analyzeBody();
+                }
+            } else if (!hasValidPose) {
+                poseDetectionCount = 0;
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('전신이 더 잘 보이도록 뒤로 물러나주세요', canvas.width / 2, 30);
+            }
+        } else {
+            // 포즈가 감지되지 않으면 카운트 리셋
+            poseDetectionCount = 0;
+
+            // 포즈가 감지되지 않을 때 안내 텍스트 표시
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('전신이 보이도록 서주세요', canvas.width / 2, 30);
         }
     } catch (error) {
         console.error('포즈 감지 오류:', error);
@@ -521,14 +645,16 @@ async function analyzeColor() {
                 analysisStep = 1;
                 updateStepUI();
 
+                // 자동 분석 플래그 리셋 (2단계 자동 분석 위해)
+                isAutoAnalyzing = false;
+                poseDetectionCount = 0;
+
                 // 포즈 감지로 전환 (얼굴 → 전신)
                 startDetection();
 
                 // 결과 영역 표시 (퍼스널 컬러만, 체형은 대기)
-                bodyResultEl.textContent = '체형 분석을 진행해주세요';
+                bodyResultEl.textContent = '전신이 감지되면 자동으로 분석됩니다';
                 resultsEl.classList.remove('hidden');
-
-                alert('전신이 보이도록 카메라에서 떨어진 후\n"체형 분석" 버튼을 눌러주세요.');
             } else {
                 // 퍼스널 컬러만으로 완료
                 analysisStep = 2;
@@ -1012,6 +1138,11 @@ if (resetBtn) {
         analysisStep = 0;
         savedColorResult = null;
         savedBodyResult = null;
+
+        // 자동 분석 변수 초기화
+        faceDetectionCount = 0;
+        poseDetectionCount = 0;
+        isAutoAnalyzing = false;
 
         // UI 초기화
         updateStepUI();
