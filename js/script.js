@@ -239,11 +239,13 @@ async function startCamera() {
         video.srcObject = stream;
 
         // 비디오가 재생 가능한 상태가 되면 시작
-        video.onloadedmetadata = async () => {
+       video.onloadedmetadata = async () => {
+            // 캔버스의 내부 드로잉 해상도를 실제 비디오 크기와 일치시킴
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
 
-            // 비디오 재생 시작
+            console.log("Canvas 해상도 설정 완료:", canvas.width, canvas.height);
+
             try {
                 await video.play();
             } catch (playError) {
@@ -417,47 +419,38 @@ async function detectFace() {
 }
 
 function drawFace(face) {
+    if (!ctx || !face.keypoints) return;
+
+    // 매 프레임 초기화
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     const keypoints = face.keypoints;
 
-    // 얼굴 윤곽 주요 포인트 (간소화된 버전)
-    const faceOutline = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-
-    // 왼쪽 눈
-    const leftEye = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
-
-    // 오른쪽 눈
-    const rightEye = [362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382];
-
-    // 입술 윤곽
-    const lips = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78];
-
-    // 피부 샘플링 영역 표시 (볼 부분)
-    const cheekPoints = [50, 101, 118, 119, 280, 330, 347, 348];
-
-    // 얼굴 윤곽 그리기
-    ctx.strokeStyle = '#f093fb';
-    ctx.lineWidth = 2;
-    drawOutline(keypoints, faceOutline);
-
-    // 눈 그리기
-    ctx.strokeStyle = '#4ECDC4';
-    ctx.lineWidth = 1.5;
-    drawOutline(keypoints, leftEye);
-    drawOutline(keypoints, rightEye);
-
-    // 입술 그리기
-    ctx.strokeStyle = '#FF6B6B';
-    ctx.lineWidth = 1.5;
-    drawOutline(keypoints, lips);
-
-    // 피부 샘플링 영역 표시 (점으로)
-    ctx.fillStyle = '#FFE66D';
-    cheekPoints.forEach(index => {
-        const point = keypoints[index];
-        if (point) {
+    // 1. 전체 랜드마크 (작은 점)
+    ctx.fillStyle = "rgba(0, 255, 0, 0.6)"; // 초록색
+    keypoints.forEach((pt, i) => {
+        if (i % 10 === 0) { // 성능을 위해 10개당 하나씩
             ctx.beginPath();
-            ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+            ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI);
             ctx.fill();
+        }
+    });
+
+    // 2. 퍼스널 컬러 샘플링 포인트 (큰 빨간 점)
+    // 10: 이마, 50: 왼볼, 280: 오른볼
+    const samplingIndices = [10, 50, 280];
+    ctx.fillStyle = "#FF0000"; // 빨간색
+    samplingIndices.forEach(idx => {
+        const pt = keypoints[idx];
+        if (pt) {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI); // 크기 5로 확대
+            ctx.fill();
+            
+            // 점 주변에 원형 테두리 추가 (가독성)
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
     });
 }
@@ -929,32 +922,22 @@ function analyzePersonalColor(face) {
 }
 
 function determineSeasonalColor(hsv, lab, r, g, b) {
-    const { h, s, v } = hsv;
-    const brightness = (r + g + b) / 3;
+    // lab.b: 노란색(웜) vs 파란색(쿨) 수치
+    // lab.l: 밝기(명도)
+    
+    // 한국인 피부 기준 수치 보정 (보통 13~15 사이가 경계선)
+    const isWarm = lab.b > 14.5; 
+    const isLight = lab.l > 62; 
 
-    // Lab 색공간의 a* 값으로 웜/쿨 판별 (양수: 웜, 음수: 쿨)
-    // Lab 색공간의 b* 값도 참고 (양수: 노란기, 음수: 파란기)
-    const isWarm = lab.a > 5 || (lab.b > 10 && h >= 10 && h <= 50);
-    const isLight = brightness > 160 || v > 0.7;
-
-    let colorType = '';
     let colorKey = '';
-
-    if (isWarm && isLight) {
-        colorType = '봄 웜톤 (Spring Warm)';
-        colorKey = 'spring_warm';
-    } else if (!isWarm && isLight) {
-        colorType = '여름 쿨톤 (Summer Cool)';
-        colorKey = 'summer_cool';
-    } else if (isWarm && !isLight) {
-        colorType = '가을 웜톤 (Autumn Warm)';
-        colorKey = 'autumn_warm';
+    if (isWarm) {
+        colorKey = isLight ? 'spring_warm' : 'autumn_warm';
     } else {
-        colorType = '겨울 쿨톤 (Winter Cool)';
-        colorKey = 'winter_cool';
+        colorKey = isLight ? 'summer_cool' : 'winter_cool';
     }
 
-    return { type: colorType, key: colorKey };
+    const colorData = STYLE_DATABASE.personalColors[colorKey];
+    return { type: colorData.name, key: colorKey };
 }
 
 // ==========================================
