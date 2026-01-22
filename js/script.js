@@ -242,7 +242,8 @@ async function startCamera() {
                 updateStepUI();
             }
 
-            detectPose();
+            // 단계에 따라 다른 감지 시작
+            startDetection();
         };
     } catch (error) {
         console.error('카메라 접근 실패:', error);
@@ -304,7 +305,116 @@ function updateStepUI() {
 }
 
 // ==========================================
-// 실시간 포즈 감지 및 시각화
+// 단계별 감지 시작/전환
+// ==========================================
+
+function startDetection() {
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+
+    // 단계에 따라 다른 감지 실행
+    if (analysisStep === 0) {
+        // 1단계: 얼굴 감지 (퍼스널 컬러용)
+        detectFace();
+    } else if (analysisStep === 1) {
+        // 2단계: 포즈 감지 (체형 분석용)
+        detectPose();
+    }
+    // analysisStep === 2: 분석 완료, 감지 불필요
+}
+
+// ==========================================
+// 실시간 얼굴 감지 및 시각화 (1단계: 퍼스널 컬러)
+// ==========================================
+
+async function detectFace() {
+    if (!isStreaming) return;
+
+    try {
+        const faces = await faceMeshDetector.estimateFaces(video);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (faces.length > 0) {
+            drawFace(faces[0]);
+        }
+    } catch (error) {
+        console.error('얼굴 감지 오류:', error);
+    }
+
+    animationId = requestAnimationFrame(detectFace);
+}
+
+function drawFace(face) {
+    const keypoints = face.keypoints;
+
+    // 얼굴 윤곽 주요 포인트 (간소화된 버전)
+    const faceOutline = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+
+    // 왼쪽 눈
+    const leftEye = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
+
+    // 오른쪽 눈
+    const rightEye = [362, 398, 384, 385, 386, 387, 388, 466, 263, 249, 390, 373, 374, 380, 381, 382];
+
+    // 입술 윤곽
+    const lips = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78];
+
+    // 피부 샘플링 영역 표시 (볼 부분)
+    const cheekPoints = [50, 101, 118, 119, 280, 330, 347, 348];
+
+    // 얼굴 윤곽 그리기
+    ctx.strokeStyle = '#f093fb';
+    ctx.lineWidth = 2;
+    drawOutline(keypoints, faceOutline);
+
+    // 눈 그리기
+    ctx.strokeStyle = '#4ECDC4';
+    ctx.lineWidth = 1.5;
+    drawOutline(keypoints, leftEye);
+    drawOutline(keypoints, rightEye);
+
+    // 입술 그리기
+    ctx.strokeStyle = '#FF6B6B';
+    ctx.lineWidth = 1.5;
+    drawOutline(keypoints, lips);
+
+    // 피부 샘플링 영역 표시 (점으로)
+    ctx.fillStyle = '#FFE66D';
+    cheekPoints.forEach(index => {
+        const point = keypoints[index];
+        if (point) {
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    });
+}
+
+function drawOutline(keypoints, indices) {
+    if (indices.length < 2) return;
+
+    ctx.beginPath();
+    const firstPoint = keypoints[indices[0]];
+    if (firstPoint) {
+        ctx.moveTo(firstPoint.x, firstPoint.y);
+    }
+
+    for (let i = 1; i < indices.length; i++) {
+        const point = keypoints[indices[i]];
+        if (point) {
+            ctx.lineTo(point.x, point.y);
+        }
+    }
+
+    // 닫힌 도형으로 만들기
+    ctx.closePath();
+    ctx.stroke();
+}
+
+// ==========================================
+// 실시간 포즈 감지 및 시각화 (2단계: 체형 분석)
 // ==========================================
 
 async function detectPose() {
@@ -411,6 +521,9 @@ async function analyzeColor() {
                 analysisStep = 1;
                 updateStepUI();
 
+                // 포즈 감지로 전환 (얼굴 → 전신)
+                startDetection();
+
                 // 결과 영역 표시 (퍼스널 컬러만, 체형은 대기)
                 bodyResultEl.textContent = '체형 분석을 진행해주세요';
                 resultsEl.classList.remove('hidden');
@@ -419,6 +532,9 @@ async function analyzeColor() {
             } else {
                 // 퍼스널 컬러만으로 완료
                 analysisStep = 2;
+
+                // 감지 중지
+                startDetection();
 
                 // UI 업데이트 (퍼스널 컬러만 완료 상태)
                 currentStepEl.textContent = '완료';
@@ -477,6 +593,9 @@ async function analyzeBody() {
                 // 단계 완료
                 analysisStep = 2;
                 updateStepUI();
+
+                // 감지 중지 (분석 완료)
+                startDetection();
 
                 // 퍼스널 컬러 + 체형 기반 스타일 추천 표시
                 displayStyleRecommendations(savedBodyResult.key, savedColorResult?.key);
@@ -896,6 +1015,11 @@ if (resetBtn) {
 
         // UI 초기화
         updateStepUI();
+
+        // 얼굴 감지 재시작 (1단계로 돌아가기)
+        if (isStreaming) {
+            startDetection();
+        }
 
         // 스타일 추천 초기화
         if (styleRecommendEl) {
