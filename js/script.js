@@ -398,15 +398,50 @@ async function analyzeColor() {
                 });
             }
 
-            // 단계 진행
-            analysisStep = 1;
-            updateStepUI();
+            // 체형 분석 진행 여부 확인
+            const wantBodyAnalysis = confirm(
+                '퍼스널 컬러 분석이 완료되었습니다!\n\n' +
+                `결과: ${savedColorResult.type}\n\n` +
+                '체형 분석도 진행하시겠습니까?\n' +
+                '(확인: 체형 분석 진행 / 취소: 퍼스널 컬러만 보기)'
+            );
 
-            // 결과 영역 표시 (퍼스널 컬러만)
-            bodyResultEl.textContent = '체형 분석을 진행해주세요';
-            resultsEl.classList.remove('hidden');
+            if (wantBodyAnalysis) {
+                // 단계 진행 (체형 분석으로)
+                analysisStep = 1;
+                updateStepUI();
 
-            alert('퍼스널 컬러 분석이 완료되었습니다!\n\n이제 전신이 보이도록 카메라에서 떨어진 후\n"체형 분석" 버튼을 눌러주세요.');
+                // 결과 영역 표시 (퍼스널 컬러만, 체형은 대기)
+                bodyResultEl.textContent = '체형 분석을 진행해주세요';
+                resultsEl.classList.remove('hidden');
+
+                alert('전신이 보이도록 카메라에서 떨어진 후\n"체형 분석" 버튼을 눌러주세요.');
+            } else {
+                // 퍼스널 컬러만으로 완료
+                analysisStep = 2;
+
+                // UI 업데이트 (퍼스널 컬러만 완료 상태)
+                currentStepEl.textContent = '완료';
+                currentStepEl.classList.add('completed');
+                stepTextEl.textContent = '퍼스널 컬러 분석이 완료되었습니다!';
+                colorAnalyzeBtn.disabled = true;
+                colorAnalyzeBtn.classList.add('completed');
+                colorAnalyzeBtn.innerHTML = '✅ 퍼스널 컬러 완료';
+                bodyAnalyzeBtn.disabled = true;
+
+                // 결과 표시 (퍼스널 컬러만)
+                bodyResultEl.textContent = '분석하지 않음';
+                resultsEl.classList.remove('hidden');
+
+                // 퍼스널 컬러 스타일 추천만 표시
+                displayStyleRecommendations(null, savedColorResult.key);
+
+                // 공유 카드 업데이트 (체형 없이)
+                updateShareCard({ type: '분석하지 않음', key: null }, savedColorResult);
+
+                // 결과로 스크롤
+                resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
 
         } else {
             alert('얼굴을 인식할 수 없습니다. 카메라를 정면으로 바라봐주세요.');
