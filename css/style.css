@@ -137,6 +137,94 @@ header p {
     transform: translateY(-2px);
 }
 
+/* ==========================================
+   단계별 분석 컨트롤
+   ========================================== */
+.step-controls {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.step-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+.step-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.step-badge.completed {
+    background: #4CAF50;
+}
+
+.step-text {
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.step-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-step {
+    flex: 1;
+    min-width: 150px;
+    padding: 15px 20px;
+    font-size: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-color {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.btn-color:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(240, 147, 251, 0.4);
+}
+
+.btn-color:disabled {
+    background: #ccc;
+    color: #888;
+}
+
+.btn-color.completed {
+    background: #4CAF50;
+}
+
+.btn-body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-body:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-body:disabled {
+    background: #ccc;
+    color: #888;
+}
+
 /* 결과 카드 */
 .results {
     display: grid;

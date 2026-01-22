@@ -29,7 +29,22 @@
             <!-- 컨트롤 버튼 -->
             <div class="controls">
                 <button id="start-btn" class="btn btn-primary" disabled>카메라 시작</button>
-                <button id="analyze-btn" class="btn btn-secondary" disabled>분석하기</button>
+            </div>
+
+            <!-- 단계별 분석 버튼 -->
+            <div class="step-controls hidden" id="step-controls">
+                <div class="step-info">
+                    <span class="step-badge" id="current-step">1단계</span>
+                    <span class="step-text" id="step-text">얼굴이 잘 보이도록 카메라를 바라봐주세요</span>
+                </div>
+                <div class="step-buttons">
+                    <button id="color-analyze-btn" class="btn btn-step btn-color" disabled>
+                        🎨 퍼스널 컬러 분석
+                    </button>
+                    <button id="body-analyze-btn" class="btn btn-step btn-body" disabled>
+                        🕴️ 체형 분석
+                    </button>
+                </div>
             </div>
 
             <!-- 분석 결과 -->

@@ -7,18 +7,29 @@ const ctx = canvas.getContext('2d');
 const loadingEl = document.getElementById('loading');
 const videoContainer = document.getElementById('video-container');
 const startBtn = document.getElementById('start-btn');
-const analyzeBtn = document.getElementById('analyze-btn');
 const resultsEl = document.getElementById('results');
 const bodyResultEl = document.getElementById('body-result');
 const colorResultEl = document.getElementById('color-result');
 const colorPaletteEl = document.getElementById('color-palette');
 const styleRecommendEl = document.getElementById('style-recommend');
 
+// 단계별 분석 DOM 요소
+const stepControls = document.getElementById('step-controls');
+const colorAnalyzeBtn = document.getElementById('color-analyze-btn');
+const bodyAnalyzeBtn = document.getElementById('body-analyze-btn');
+const currentStepEl = document.getElementById('current-step');
+const stepTextEl = document.getElementById('step-text');
+
 // 모델 변수
 let poseDetector = null;
 let faceMeshDetector = null;
 let isStreaming = false;
 let animationId = null;
+
+// 분석 결과 저장 변수
+let savedColorResult = null;
+let savedBodyResult = null;
+let analysisStep = 0; // 0: 시작 전, 1: 퍼스널 컬러 완료, 2: 체형 완료
 
 // ==========================================
 // 스타일 추천 데이터베이스
@@ -223,7 +234,14 @@ async function startCamera() {
             canvas.height = video.videoHeight;
             isStreaming = true;
             startBtn.textContent = '카메라 중지';
-            analyzeBtn.disabled = false;
+
+            // 단계별 컨트롤 표시
+            if (stepControls) {
+                stepControls.classList.remove('hidden');
+                colorAnalyzeBtn.disabled = false;
+                updateStepUI();
+            }
+
             detectPose();
         };
     } catch (error) {
@@ -243,8 +261,46 @@ function stopCamera() {
     }
     isStreaming = false;
     startBtn.textContent = '카메라 시작';
-    analyzeBtn.disabled = true;
+
+    // 단계별 컨트롤 숨기기
+    if (stepControls) {
+        stepControls.classList.add('hidden');
+        colorAnalyzeBtn.disabled = true;
+        bodyAnalyzeBtn.disabled = true;
+    }
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// 단계 UI 업데이트
+function updateStepUI() {
+    if (!currentStepEl || !stepTextEl) return;
+
+    if (analysisStep === 0) {
+        currentStepEl.textContent = '1단계';
+        currentStepEl.classList.remove('completed');
+        stepTextEl.textContent = '얼굴이 잘 보이도록 카메라를 바라봐주세요';
+        colorAnalyzeBtn.disabled = false;
+        colorAnalyzeBtn.classList.remove('completed');
+        colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
+        bodyAnalyzeBtn.disabled = true;
+    } else if (analysisStep === 1) {
+        currentStepEl.textContent = '2단계';
+        currentStepEl.classList.remove('completed');
+        stepTextEl.textContent = '전신이 보이도록 카메라에서 떨어져주세요';
+        colorAnalyzeBtn.disabled = true;
+        colorAnalyzeBtn.classList.add('completed');
+        colorAnalyzeBtn.innerHTML = '✅ 퍼스널 컬러 완료';
+        bodyAnalyzeBtn.disabled = false;
+    } else if (analysisStep === 2) {
+        currentStepEl.textContent = '완료';
+        currentStepEl.classList.add('completed');
+        stepTextEl.textContent = '분석이 완료되었습니다!';
+        colorAnalyzeBtn.disabled = true;
+        bodyAnalyzeBtn.disabled = true;
+        bodyAnalyzeBtn.classList.add('completed');
+        bodyAnalyzeBtn.innerHTML = '✅ 체형 분석 완료';
+    }
 }
 
 // ==========================================
@@ -310,41 +366,112 @@ function drawPose(pose) {
 }
 
 // ==========================================
-// 분석 실행
+// 단계별 분석 실행
 // ==========================================
 
-async function analyze() {
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = '분석 중...';
-    resultsEl.classList.add('hidden');
+// 1단계: 퍼스널 컬러 분석
+async function analyzeColor() {
+    if (!colorAnalyzeBtn) return;
+
+    colorAnalyzeBtn.disabled = true;
+    colorAnalyzeBtn.innerHTML = '분석 중...';
 
     try {
-        // 포즈 분석
-        const poses = await poseDetector.estimatePoses(video);
-        let bodyResult = { type: null, key: null };
-
-        if (poses.length > 0) {
-            bodyResult = analyzeBodyType(poses[0]);
-        }
-
-        // 얼굴 분석
         const faces = await faceMeshDetector.estimateFaces(video);
-        let colorResult = { type: null, key: null };
 
         if (faces.length > 0) {
-            colorResult = analyzePersonalColor(faces[0]);
+            savedColorResult = analyzePersonalColor(faces[0]);
+
+            // 퍼스널 컬러 결과만 먼저 표시
+            colorResultEl.textContent = savedColorResult.type;
+
+            // 컬러 팔레트 표시
+            colorPaletteEl.innerHTML = '';
+            if (savedColorResult.key && STYLE_DATABASE.personalColors[savedColorResult.key]) {
+                const colorData = STYLE_DATABASE.personalColors[savedColorResult.key];
+                colorData.palette.forEach((color, index) => {
+                    const swatch = document.createElement('div');
+                    swatch.className = 'color-swatch';
+                    swatch.style.backgroundColor = color;
+                    swatch.title = colorData.colorNames[index];
+                    colorPaletteEl.appendChild(swatch);
+                });
+            }
+
+            // 단계 진행
+            analysisStep = 1;
+            updateStepUI();
+
+            // 결과 영역 표시 (퍼스널 컬러만)
+            bodyResultEl.textContent = '체형 분석을 진행해주세요';
+            resultsEl.classList.remove('hidden');
+
+            alert('퍼스널 컬러 분석이 완료되었습니다!\n\n이제 전신이 보이도록 카메라에서 떨어진 후\n"체형 분석" 버튼을 눌러주세요.');
+
+        } else {
+            alert('얼굴을 인식할 수 없습니다. 카메라를 정면으로 바라봐주세요.');
+            colorAnalyzeBtn.disabled = false;
+            colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
         }
 
-        // 결과 표시
-        displayResults(bodyResult, colorResult);
+    } catch (error) {
+        console.error('퍼스널 컬러 분석 오류:', error);
+        alert('분석 중 오류가 발생했습니다. 다시 시도해주세요.');
+        colorAnalyzeBtn.disabled = false;
+        colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
+    }
+}
+
+// 2단계: 체형 분석 (퍼스널 컬러 포함)
+async function analyzeBody() {
+    if (!bodyAnalyzeBtn) return;
+
+    bodyAnalyzeBtn.disabled = true;
+    bodyAnalyzeBtn.innerHTML = '분석 중...';
+
+    try {
+        const poses = await poseDetector.estimatePoses(video);
+
+        if (poses.length > 0) {
+            savedBodyResult = analyzeBodyType(poses[0]);
+
+            if (savedBodyResult.key) {
+                // 체형 결과 표시
+                bodyResultEl.textContent = savedBodyResult.type;
+
+                // 단계 완료
+                analysisStep = 2;
+                updateStepUI();
+
+                // 퍼스널 컬러 + 체형 기반 스타일 추천 표시
+                displayStyleRecommendations(savedBodyResult.key, savedColorResult?.key);
+
+                // 공유 카드 업데이트
+                updateShareCard(savedBodyResult, savedColorResult || { type: '-', key: null });
+
+                // 결과로 스크롤
+                resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            } else {
+                // 체형 인식 실패
+                bodyResultEl.textContent = savedBodyResult.type;
+                bodyAnalyzeBtn.disabled = false;
+                bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
+                alert('전신이 잘 보이도록 카메라에서 더 떨어져주세요.');
+            }
+
+        } else {
+            alert('포즈를 인식할 수 없습니다. 전신이 보이도록 서주세요.');
+            bodyAnalyzeBtn.disabled = false;
+            bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
+        }
 
     } catch (error) {
-        console.error('분석 오류:', error);
+        console.error('체형 분석 오류:', error);
         alert('분석 중 오류가 발생했습니다. 다시 시도해주세요.');
+        bodyAnalyzeBtn.disabled = false;
+        bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
     }
-
-    analyzeBtn.disabled = false;
-    analyzeBtn.textContent = '분석하기';
 }
 
 // ==========================================
@@ -711,13 +838,34 @@ startBtn.addEventListener('click', () => {
     }
 });
 
-analyzeBtn.addEventListener('click', analyze);
+// 단계별 분석 버튼
+if (colorAnalyzeBtn) {
+    colorAnalyzeBtn.addEventListener('click', analyzeColor);
+}
 
-// 다시 측정하기 버튼 (있는 경우)
+if (bodyAnalyzeBtn) {
+    bodyAnalyzeBtn.addEventListener('click', analyzeBody);
+}
+
+// 다시 측정하기 버튼
 const resetBtn = document.getElementById('reset-btn');
 if (resetBtn) {
     resetBtn.addEventListener('click', () => {
+        // 결과 숨기기
         resultsEl.classList.add('hidden');
+
+        // 분석 상태 초기화
+        analysisStep = 0;
+        savedColorResult = null;
+        savedBodyResult = null;
+
+        // UI 초기화
+        updateStepUI();
+
+        // 스타일 추천 초기화
+        if (styleRecommendEl) {
+            styleRecommendEl.innerHTML = '';
+        }
     });
 }
 
