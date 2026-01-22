@@ -604,10 +604,43 @@ function displayResults(bodyResult, colorResult) {
     // 스타일 추천 표시
     displayStyleRecommendations(bodyResult.key, colorResult.key);
 
+    // 공유 카드 업데이트
+    updateShareCard(bodyResult, colorResult);
+
     resultsEl.classList.remove('hidden');
 
     // 결과로 스크롤
     resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 공유 카드 업데이트
+function updateShareCard(bodyResult, colorResult) {
+    const shareBodyResult = document.getElementById('share-body-result');
+    const shareColorResult = document.getElementById('share-color-result');
+    const sharePalette = document.getElementById('share-palette');
+
+    if (shareBodyResult) {
+        // 체형 이름만 추출 (괄호 앞부분)
+        const bodyName = bodyResult.type ? bodyResult.type.split('(')[0].trim() : '-';
+        shareBodyResult.textContent = bodyName;
+    }
+
+    if (shareColorResult) {
+        // 퍼스널 컬러 이름만 추출 (괄호 앞부분)
+        const colorName = colorResult.type ? colorResult.type.split('(')[0].trim() : '-';
+        shareColorResult.textContent = colorName;
+    }
+
+    if (sharePalette && colorResult.key && STYLE_DATABASE.personalColors[colorResult.key]) {
+        sharePalette.innerHTML = '';
+        const colorData = STYLE_DATABASE.personalColors[colorResult.key];
+        colorData.palette.forEach((color) => {
+            const swatch = document.createElement('div');
+            swatch.className = 'color-swatch';
+            swatch.style.backgroundColor = color;
+            sharePalette.appendChild(swatch);
+        });
+    }
 }
 
 function displayStyleRecommendations(bodyKey, colorKey) {
@@ -685,6 +718,112 @@ const resetBtn = document.getElementById('reset-btn');
 if (resetBtn) {
     resetBtn.addEventListener('click', () => {
         resultsEl.classList.add('hidden');
+    });
+}
+
+// ==========================================
+// SNS 공유 기능
+// ==========================================
+
+const SITE_URL = 'https://re-spring.pages.dev';
+
+// 이미지 다운로드
+const downloadBtn = document.getElementById('download-btn');
+if (downloadBtn) {
+    downloadBtn.addEventListener('click', async () => {
+        const shareCard = document.getElementById('share-card');
+        if (!shareCard) return;
+
+        try {
+            downloadBtn.textContent = '생성 중...';
+            downloadBtn.disabled = true;
+
+            const canvas = await html2canvas(shareCard, {
+                scale: 2,
+                backgroundColor: null,
+                useCORS: true
+            });
+
+            const link = document.createElement('a');
+            link.download = 'ai-style-coach-result.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+
+            downloadBtn.textContent = '📥 이미지 저장';
+            downloadBtn.disabled = false;
+        } catch (error) {
+            console.error('이미지 생성 실패:', error);
+            alert('이미지 생성에 실패했습니다.');
+            downloadBtn.textContent = '📥 이미지 저장';
+            downloadBtn.disabled = false;
+        }
+    });
+}
+
+// 트위터 공유
+const twitterBtn = document.getElementById('twitter-btn');
+if (twitterBtn) {
+    twitterBtn.addEventListener('click', () => {
+        const bodyText = document.getElementById('share-body-result')?.textContent || '';
+        const colorText = document.getElementById('share-color-result')?.textContent || '';
+
+        const text = `AI 스타일 코치 분석 결과!\n\n체형: ${bodyText}\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기 👇`;
+        const url = encodeURIComponent(SITE_URL);
+        const tweetText = encodeURIComponent(text);
+
+        window.open(`https://twitter.com/intent/tweet?text=${tweetText}&url=${url}`, '_blank');
+    });
+}
+
+// 페이스북 공유
+const facebookBtn = document.getElementById('facebook-btn');
+if (facebookBtn) {
+    facebookBtn.addEventListener('click', () => {
+        const url = encodeURIComponent(SITE_URL);
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+    });
+}
+
+// 카카오톡 공유
+const kakaoBtn = document.getElementById('kakao-btn');
+if (kakaoBtn) {
+    kakaoBtn.addEventListener('click', () => {
+        const bodyText = document.getElementById('share-body-result')?.textContent || '';
+        const colorText = document.getElementById('share-color-result')?.textContent || '';
+
+        // 카카오 SDK가 없으면 클립보드 복사로 대체
+        if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
+            Kakao.Share.sendDefault({
+                objectType: 'feed',
+                content: {
+                    title: 'AI 스타일 코치 분석 결과',
+                    description: `체형: ${bodyText} / 퍼스널 컬러: ${colorText}`,
+                    imageUrl: 'https://re-spring.pages.dev/og-image.png',
+                    link: {
+                        mobileWebUrl: SITE_URL,
+                        webUrl: SITE_URL
+                    }
+                },
+                buttons: [
+                    {
+                        title: '나도 분석하기',
+                        link: {
+                            mobileWebUrl: SITE_URL,
+                            webUrl: SITE_URL
+                        }
+                    }
+                ]
+            });
+        } else {
+            // 카카오 SDK 없으면 링크 복사
+            const shareText = `AI 스타일 코치 분석 결과!\n체형: ${bodyText}\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기: ${SITE_URL}`;
+
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('공유 내용이 클립보드에 복사되었습니다!\n카카오톡에 붙여넣기 해주세요.');
+            }).catch(() => {
+                prompt('아래 내용을 복사해서 공유해주세요:', shareText);
+            });
+        }
     });
 }
 

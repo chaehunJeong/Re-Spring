@@ -13,7 +13,7 @@
     - [x] 비디오 위에 분석 결과를 그릴 `Canvas` 오버레이 설정
 
 ### 🕴️ 2단계: 체형 분석 기능 (Body Analysis)
-- [x] **BlazePose 모델 로드**
+- [x] **MoveNet 모델 로드** (tfjs 런타임)
     - [x] `pose-detection` 모델 초기화 및 로드 확인
 - [x] **신체 포인트(Keypoints) 추출**
     - [x] 어깨(Shoulder), 골반(Hip), 무릎(Knee) 좌표값 가져오기
@@ -24,7 +24,7 @@
     - [x] 실시간으로 관절 위치를 캔버스에 점과 선으로 그리기
 
 ### 🌈 3단계: 퍼스널 컬러 분석 기능 (Color Analysis)
-- [x] **FaceMesh 모델 로드**
+- [x] **FaceMesh 모델 로드** (tfjs 런타임)
     - [x] 얼굴 468개 랜드마크 모델 초기화
 - [x] **피부 영역 타겟팅**
     - [x] 볼(Cheek) 및 이마(Forehead) 부위의 특정 랜드마크 좌표 추출
@@ -45,7 +45,20 @@
 - [x] **로딩 애니메이션**
     - [x] 모델 로드 중일 때 보여줄 스피너 추가
 
-### 🚀 5단계: 배포 (Cloudflare Pages)
+### 📱 5단계: SNS 공유 기능
+- [x] **html2canvas 라이브러리 추가**
+    - [x] 결과 카드를 이미지로 캡처
+- [x] **공유용 결과 카드 디자인**
+    - [x] 그라데이션 배경의 예쁜 공유 카드 UI
+    - [x] 체형/퍼스널 컬러 결과 + 컬러 팔레트 표시
+- [x] **이미지 다운로드 기능**
+    - [x] PNG 이미지로 저장
+- [x] **SNS 공유 버튼**
+    - [x] 트위터 공유
+    - [x] 페이스북 공유
+    - [x] 카카오톡 공유 (클립보드 복사 방식)
+
+### 🚀 6단계: 배포 (Cloudflare Pages)
 - [x] **GitHub 저장소 생성**
     - [x] 작성한 코드 `Push` 하기
 - [ ] **Cloudflare Pages 연결**
@@ -68,7 +81,14 @@ Re-Spring/
 
 ## 💡 기술 스택 및 참고 사항
 * **Frontend:** HTML5, CSS3, JavaScript (Vanilla JS)
-* **AI Engine:** TensorFlow.js, MediaPipe (BlazePose, FaceMesh)
+* **AI Engine:** TensorFlow.js (MoveNet, FaceMesh - tfjs 런타임)
+* **Image Capture:** html2canvas
 * **Deployment:** Cloudflare Pages (무료 정적 호스팅)
 * **Privacy:** 모든 연산은 클라이언트 사이드에서 수행되어 데이터가 서버로 전송되지 않음.
 * **Lighting:** 퍼스널 컬러 분석 시 자연광 확보가 중요함.
+
+## 🔗 공유 기능
+* **이미지 저장:** html2canvas로 결과 카드를 PNG로 저장
+* **트위터:** Intent API로 결과 텍스트 + URL 공유
+* **페이스북:** Sharer API로 URL 공유
+* **카카오톡:** 클립보드 복사 후 붙여넣기 방식
