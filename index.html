@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 스타일 코치 - 체형 & 퍼스널 컬러 분석</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="container">
@@ -43,6 +43,17 @@
                     <p id="color-result">-</p>
                     <div id="color-palette" class="color-palette"></div>
                 </div>
+
+                <!-- 스타일 추천 -->
+                <div class="result-card full-width">
+                    <h3>맞춤 스타일 추천</h3>
+                    <div id="style-recommend" class="style-recommend"></div>
+                </div>
+
+                <!-- 다시 측정 버튼 -->
+                <div class="result-actions">
+                    <button id="reset-btn" class="btn btn-primary">다시 측정하기</button>
+                </div>
             </div>
         </main>
 
@@ -61,6 +72,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js"></script>
 
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
 </body>
 </html>

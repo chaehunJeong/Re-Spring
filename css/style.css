@@ -168,6 +168,7 @@ header p {
     display: flex;
     gap: 10px;
     margin-top: 15px;
+    flex-wrap: wrap;
 }
 
 .color-palette .color-swatch {
@@ -175,6 +176,104 @@ header p {
     height: 40px;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.color-palette .color-swatch:hover {
+    transform: scale(1.1);
+}
+
+/* 전체 너비 카드 */
+.result-card.full-width {
+    grid-column: 1 / -1;
+}
+
+/* 스타일 추천 */
+.style-recommend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.recommend-section {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    border-left: 4px solid #667eea;
+}
+
+.recommend-section h4 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+}
+
+.recommend-section .description {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    font-style: italic;
+}
+
+.recommend-list,
+.makeup-list {
+    margin-bottom: 15px;
+}
+
+.recommend-list strong,
+.makeup-list strong,
+.avoid-list strong {
+    color: #444;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.recommend-list ul,
+.makeup-list ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.recommend-list li,
+.makeup-list li {
+    padding: 5px 0;
+    padding-left: 20px;
+    position: relative;
+    color: #555;
+}
+
+.recommend-list li::before,
+.makeup-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #667eea;
+}
+
+.avoid-list {
+    margin-top: 10px;
+}
+
+.avoid-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.avoid-tag {
+    background: #ffe0e0;
+    color: #c53030;
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+}
+
+/* 결과 액션 버튼 */
+.result-actions {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 10px;
 }
 
 /* 푸터 */
