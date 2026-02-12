@@ -8,33 +8,26 @@ const loadingEl = document.getElementById('loading');
 const videoContainer = document.getElementById('video-container');
 const startBtn = document.getElementById('start-btn');
 const resultsEl = document.getElementById('results');
-const bodyResultEl = document.getElementById('body-result');
 const colorResultEl = document.getElementById('color-result');
 const colorPaletteEl = document.getElementById('color-palette');
 const styleRecommendEl = document.getElementById('style-recommend');
 
-// 단계별 분석 DOM 요소
+// 분석 버튼 DOM 요소
 const stepControls = document.getElementById('step-controls');
 const colorAnalyzeBtn = document.getElementById('color-analyze-btn');
-const bodyAnalyzeBtn = document.getElementById('body-analyze-btn');
-const currentStepEl = document.getElementById('current-step');
 const stepTextEl = document.getElementById('step-text');
 
 // 모델 변수
-let poseDetector = null;
 let faceMeshDetector = null;
 let isStreaming = false;
 let animationId = null;
 
 // 분석 결과 저장 변수
 let savedColorResult = null;
-let savedBodyResult = null;
-let analysisStep = 0; // 0: 시작 전, 1: 퍼스널 컬러 완료, 2: 체형 완료
 
 // 자동 분석을 위한 변수
 let faceDetectionCount = 0;
-let poseDetectionCount = 0;
-const AUTO_ANALYZE_THRESHOLD = 30; // 약 1초 (30프레임) 동안 안정적으로 감지되면 자동 분석
+const AUTO_ANALYZE_THRESHOLD = 30;
 let isAutoAnalyzing = false;
 
 // 카메라 전환 관련 변수
@@ -42,78 +35,10 @@ const switchCameraBtn = document.getElementById('switch-camera-btn');
 let currentFacingMode = 'user'; // 'user' = 전면, 'environment' = 후면
 
 // ==========================================
-// 스타일 추천 데이터베이스
+// 퍼스널 컬러 데이터베이스
 // ==========================================
 
 const STYLE_DATABASE = {
-    bodyTypes: {
-        inverted_triangle: {
-            name: '역삼각형',
-            description: '어깨가 넓고 골반이 좁은 타입',
-            recommendations: [
-                'V넥, 라운드넥 상의로 어깨 라인 부드럽게',
-                'A라인 스커트/바지로 하체 볼륨 추가',
-                '밝은 색상 하의로 시선 분산',
-                '힙 포켓이 있는 바지 추천',
-                '패드 없는 어깨 디자인'
-            ],
-            avoid: ['보트넥', '퍼프 소매', '어깨 패드'],
-            icons: ['👔', '👖', '👗']
-        },
-        triangle: {
-            name: '삼각형',
-            description: '골반이 어깨보다 넓은 타입',
-            recommendations: [
-                '보트넥, 오프숄더로 어깨 라인 강조',
-                '밝은 색상 상의로 시선 위로',
-                '스트레이트/부츠컷 팬츠',
-                'A라인 원피스',
-                '디테일이 있는 상의'
-            ],
-            avoid: ['스키니진', '밝은 색상 하의', '펜슬 스커트'],
-            icons: ['👚', '👗', '🧥']
-        },
-        rectangle: {
-            name: '직사각형',
-            description: '어깨와 골반이 비슷한 타입',
-            recommendations: [
-                '허리 벨트로 실루엣 강조',
-                '페플럼 탑으로 곡선 연출',
-                '랩 원피스/스커트',
-                '크롭탑 + 하이웨이스트 조합',
-                '레이어드 스타일링'
-            ],
-            avoid: ['박시한 실루엣', '일자 원피스'],
-            icons: ['👗', '👠', '💃']
-        },
-        hourglass: {
-            name: '모래시계',
-            description: '어깨와 골반이 균형잡히고 허리가 잘록한 타입',
-            recommendations: [
-                '바디컨 드레스로 실루엣 강조',
-                '허리라인 강조하는 벨트',
-                '랩 스타일 상의',
-                '하이웨이스트 하의',
-                '피트된 재킷'
-            ],
-            avoid: ['박시한 옷', '허리를 가리는 스타일'],
-            icons: ['👗', '💄', '✨']
-        },
-        oval: {
-            name: '타원형',
-            description: '중심부에 볼륨이 있는 타입',
-            recommendations: [
-                'V넥으로 시선 세로 분산',
-                '세로 스트라이프 패턴',
-                '엠파이어 라인 원피스',
-                '플레어 하의',
-                '롱 카디건/재킷'
-            ],
-            avoid: ['타이트한 옷', '가로 스트라이프', '짧은 상의'],
-            icons: ['🧥', '👗', '🎀']
-        }
-    },
-
     personalColors: {
         spring_warm: {
             name: '봄 웜톤',
@@ -203,14 +128,6 @@ async function loadModels() {
     await tf.setBackend('webgl');
     await tf.ready();
 
-    // MoveNet 모델 로드 (체형 분석용)
-    poseDetector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.MoveNet,
-        {
-            modelType: poseDetection.movenet.modelType.SINGLEPOSE_THUNDER
-        }
-    );
-
     // FaceMesh 모델 로드 (퍼스널 컬러 분석용)
     faceMeshDetector = await faceLandmarksDetection.createDetector(
         faceLandmarksDetection.SupportedModels.MediaPipeFaceMesh,
@@ -262,16 +179,13 @@ async function startCamera() {
             isStreaming = true;
             startBtn.textContent = '카메라 중지';
 
-            // 단계별 컨트롤 표시
             if (stepControls) {
                 stepControls.classList.remove('hidden');
                 colorAnalyzeBtn.disabled = false;
-                updateStepUI();
             }
 
-            // 약간의 지연 후 감지 시작 (모델 준비 시간)
             setTimeout(() => {
-                startDetection();
+                detectFace();
             }, 500);
         };
     } catch (error) {
@@ -292,11 +206,9 @@ function stopCamera() {
     isStreaming = false;
     startBtn.textContent = '카메라 시작';
 
-    // 단계별 컨트롤 숨기기
     if (stepControls) {
         stepControls.classList.add('hidden');
         colorAnalyzeBtn.disabled = true;
-        bodyAnalyzeBtn.disabled = true;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -349,9 +261,8 @@ async function switchCamera() {
                 console.error('비디오 재생 실패:', playError);
             }
 
-            // 감지 재시작
             if (isStreaming) {
-                startDetection();
+                detectFace();
             }
         };
     } catch (error) {
@@ -360,58 +271,6 @@ async function switchCamera() {
         // 원래 카메라로 복구
         currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
     }
-}
-
-// 단계 UI 업데이트
-function updateStepUI() {
-    if (!currentStepEl || !stepTextEl) return;
-
-    if (analysisStep === 0) {
-        currentStepEl.textContent = '1단계';
-        currentStepEl.classList.remove('completed');
-        stepTextEl.textContent = '얼굴이 잘 보이도록 카메라를 바라봐주세요';
-        colorAnalyzeBtn.disabled = false;
-        colorAnalyzeBtn.classList.remove('completed');
-        colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
-        bodyAnalyzeBtn.disabled = true;
-    } else if (analysisStep === 1) {
-        currentStepEl.textContent = '2단계';
-        currentStepEl.classList.remove('completed');
-        stepTextEl.textContent = '전신이 보이도록 카메라에서 떨어져주세요';
-        colorAnalyzeBtn.disabled = true;
-        colorAnalyzeBtn.classList.add('completed');
-        colorAnalyzeBtn.innerHTML = '✅ 퍼스널 컬러 완료';
-        bodyAnalyzeBtn.disabled = false;
-    } else if (analysisStep === 2) {
-        currentStepEl.textContent = '완료';
-        currentStepEl.classList.add('completed');
-        stepTextEl.textContent = '분석이 완료되었습니다!';
-        colorAnalyzeBtn.disabled = true;
-        bodyAnalyzeBtn.disabled = true;
-        bodyAnalyzeBtn.classList.add('completed');
-        bodyAnalyzeBtn.innerHTML = '✅ 체형 분석 완료';
-    }
-}
-
-// ==========================================
-// 단계별 감지 시작/전환
-// ==========================================
-
-function startDetection() {
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
-
-    // 단계에 따라 다른 감지 실행
-    if (analysisStep === 0) {
-        // 1단계: 얼굴 감지 (퍼스널 컬러용)
-        detectFace();
-    } else if (analysisStep === 1) {
-        // 2단계: 포즈 감지 (체형 분석용)
-        detectPose();
-    }
-    // analysisStep === 2: 분석 완료, 감지 불필요
 }
 
 // ==========================================
@@ -583,126 +442,9 @@ function drawFlippedProgressBar(progress, y, color) {
 }
 
 // ==========================================
-// 실시간 포즈 감지 및 시각화 (2단계: 체형 분석)
+// 퍼스널 컬러 분석 실행
 // ==========================================
 
-async function detectPose() {
-    if (!isStreaming) return;
-
-    try {
-        // 비디오가 준비되었는지 확인
-        if (video.readyState < 2) {
-            animationId = requestAnimationFrame(detectPose);
-            return;
-        }
-
-        const poses = await poseDetector.estimatePoses(video);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (poses.length > 0) {
-            const pose = poses[0];
-            drawPose(pose);
-
-            // 체형 분석에 필요한 키포인트가 충분히 감지되었는지 확인
-            const keypoints = pose.keypoints;
-            const leftShoulder = keypoints[5];
-            const rightShoulder = keypoints[6];
-            const leftHip = keypoints[11];
-            const rightHip = keypoints[12];
-
-            const hasValidPose = leftShoulder.score > 0.5 && rightShoulder.score > 0.5 &&
-                                leftHip.score > 0.5 && rightHip.score > 0.5;
-
-            // 자동 분석: 포즈가 안정적으로 감지되면 자동 분석
-            if (analysisStep === 1 && !isAutoAnalyzing && hasValidPose) {
-                poseDetectionCount++;
-
-                // 진행 상황 표시 (반전 텍스트)
-                const progress = Math.min(100, Math.round((poseDetectionCount / AUTO_ANALYZE_THRESHOLD) * 100));
-                drawFlippedText(`체형 분석 준비 중... ${progress}%`, canvas.width / 2, 30, {
-                    font: 'bold 14px sans-serif',
-                    fillStyle: 'rgba(255, 255, 255, 0.9)'
-                });
-
-                // 진행바 그리기 (반전)
-                drawFlippedProgressBar(progress, 40, '#667eea');
-
-                if (poseDetectionCount >= AUTO_ANALYZE_THRESHOLD) {
-                    isAutoAnalyzing = true;
-                    poseDetectionCount = 0;
-                    // 자동으로 체형 분석 실행
-                    analyzeBody();
-                }
-            } else if (!hasValidPose) {
-                poseDetectionCount = 0;
-                drawFlippedText('전신이 더 잘 보이도록 뒤로 물러나주세요', canvas.width / 2, 30, {
-                    font: '16px sans-serif',
-                    fillStyle: 'rgba(255, 255, 255, 0.8)'
-                });
-            }
-        } else {
-            // 포즈가 감지되지 않으면 카운트 리셋
-            poseDetectionCount = 0;
-
-            // 포즈가 감지되지 않을 때 안내 텍스트 표시 (반전)
-            drawFlippedText('전신이 보이도록 서주세요', canvas.width / 2, 30, {
-                font: '16px sans-serif',
-                fillStyle: 'rgba(255, 255, 255, 0.8)'
-            });
-        }
-    } catch (error) {
-        console.error('포즈 감지 오류:', error);
-    }
-
-    animationId = requestAnimationFrame(detectPose);
-}
-
-function drawPose(pose) {
-    const keypoints = pose.keypoints;
-
-    // 연결선 정의 (MoveNet)
-    const connections = [
-        [5, 6],   // 어깨
-        [5, 7], [7, 9],   // 왼팔
-        [6, 8], [8, 10],  // 오른팔
-        [5, 11], [6, 12], // 몸통
-        [11, 12], // 골반
-        [11, 13], [13, 15], // 왼다리
-        [12, 14], [14, 16]  // 오른다리
-    ];
-
-    // 연결선 그리기
-    ctx.strokeStyle = '#00ff00';
-    ctx.lineWidth = 3;
-
-    connections.forEach(([i, j]) => {
-        const kp1 = keypoints[i];
-        const kp2 = keypoints[j];
-
-        if (kp1.score > 0.3 && kp2.score > 0.3) {
-            ctx.beginPath();
-            ctx.moveTo(kp1.x, kp1.y);
-            ctx.lineTo(kp2.x, kp2.y);
-            ctx.stroke();
-        }
-    });
-
-    // 키포인트 그리기
-    keypoints.forEach((kp) => {
-        if (kp.score > 0.3) {
-            ctx.fillStyle = '#ff0000';
-            ctx.beginPath();
-            ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-    });
-}
-
-// ==========================================
-// 단계별 분석 실행
-// ==========================================
-
-// 1단계: 퍼스널 컬러 분석
 async function analyzeColor() {
     if (!colorAnalyzeBtn) return;
 
@@ -722,10 +464,15 @@ async function analyzeColor() {
         if (faces.length > 0) {
             savedColorResult = analyzePersonalColor(faces[0]);
 
-            // 퍼스널 컬러 결과만 먼저 표시
+            // 감지 중지
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+
+            // 결과 표시
             colorResultEl.textContent = savedColorResult.type;
 
-            // 컬러 팔레트 표시
             colorPaletteEl.innerHTML = '';
             if (savedColorResult.key && STYLE_DATABASE.personalColors[savedColorResult.key]) {
                 const colorData = STYLE_DATABASE.personalColors[savedColorResult.key];
@@ -738,58 +485,15 @@ async function analyzeColor() {
                 });
             }
 
-            // 체형 분석 진행 여부 확인
-            const wantBodyAnalysis = confirm(
-                '퍼스널 컬러 분석이 완료되었습니다!\n\n' +
-                `결과: ${savedColorResult.type}\n\n` +
-                '체형 분석도 진행하시겠습니까?\n' +
-                '(확인: 체형 분석 진행 / 취소: 퍼스널 컬러만 보기)'
-            );
+            displayStyleRecommendations(savedColorResult.key);
+            updateShareCard(savedColorResult);
 
-            if (wantBodyAnalysis) {
-                // 단계 진행 (체형 분석으로)
-                analysisStep = 1;
-                updateStepUI();
+            colorAnalyzeBtn.classList.add('completed');
+            colorAnalyzeBtn.innerHTML = '✅ 분석 완료';
+            if (stepTextEl) stepTextEl.textContent = '퍼스널 컬러 분석이 완료되었습니다!';
 
-                // 자동 분석 플래그 리셋 (2단계 자동 분석 위해)
-                isAutoAnalyzing = false;
-                poseDetectionCount = 0;
-
-                // 포즈 감지로 전환 (얼굴 → 전신)
-                startDetection();
-
-                // 결과 영역 표시 (퍼스널 컬러만, 체형은 대기)
-                bodyResultEl.textContent = '전신이 감지되면 자동으로 분석됩니다';
-                resultsEl.classList.remove('hidden');
-            } else {
-                // 퍼스널 컬러만으로 완료
-                analysisStep = 2;
-
-                // 감지 중지
-                startDetection();
-
-                // UI 업데이트 (퍼스널 컬러만 완료 상태)
-                currentStepEl.textContent = '완료';
-                currentStepEl.classList.add('completed');
-                stepTextEl.textContent = '퍼스널 컬러 분석이 완료되었습니다!';
-                colorAnalyzeBtn.disabled = true;
-                colorAnalyzeBtn.classList.add('completed');
-                colorAnalyzeBtn.innerHTML = '✅ 퍼스널 컬러 완료';
-                bodyAnalyzeBtn.disabled = true;
-
-                // 결과 표시 (퍼스널 컬러만)
-                bodyResultEl.textContent = '분석하지 않음';
-                resultsEl.classList.remove('hidden');
-
-                // 퍼스널 컬러 스타일 추천만 표시
-                displayStyleRecommendations(null, savedColorResult.key);
-
-                // 공유 카드 업데이트 (체형 없이)
-                updateShareCard({ type: '분석하지 않음', key: null }, savedColorResult);
-
-                // 결과로 스크롤
-                resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            resultsEl.classList.remove('hidden');
+            resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         } else {
             alert('얼굴을 인식할 수 없습니다. 카메라를 정면으로 바라봐주세요.');
@@ -803,132 +507,6 @@ async function analyzeColor() {
         colorAnalyzeBtn.disabled = false;
         colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
     }
-}
-
-// 2단계: 체형 분석 (퍼스널 컬러 포함)
-async function analyzeBody() {
-    if (!bodyAnalyzeBtn) return;
-
-    bodyAnalyzeBtn.disabled = true;
-    bodyAnalyzeBtn.innerHTML = '분석 중...';
-
-    try {
-        const poses = await poseDetector.estimatePoses(video);
-
-        if (poses.length > 0) {
-            savedBodyResult = analyzeBodyType(poses[0]);
-
-            if (savedBodyResult.key) {
-                // 체형 결과 표시
-                bodyResultEl.textContent = savedBodyResult.type;
-
-                // 단계 완료
-                analysisStep = 2;
-                updateStepUI();
-
-                // 감지 중지 (분석 완료)
-                startDetection();
-
-                // 퍼스널 컬러 + 체형 기반 스타일 추천 표시
-                displayStyleRecommendations(savedBodyResult.key, savedColorResult?.key);
-
-                // 공유 카드 업데이트
-                updateShareCard(savedBodyResult, savedColorResult || { type: '-', key: null });
-
-                // 결과로 스크롤
-                resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-            } else {
-                // 체형 인식 실패
-                bodyResultEl.textContent = savedBodyResult.type;
-                bodyAnalyzeBtn.disabled = false;
-                bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
-                alert('전신이 잘 보이도록 카메라에서 더 떨어져주세요.');
-            }
-
-        } else {
-            alert('포즈를 인식할 수 없습니다. 전신이 보이도록 서주세요.');
-            bodyAnalyzeBtn.disabled = false;
-            bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
-        }
-
-    } catch (error) {
-        console.error('체형 분석 오류:', error);
-        alert('분석 중 오류가 발생했습니다. 다시 시도해주세요.');
-        bodyAnalyzeBtn.disabled = false;
-        bodyAnalyzeBtn.innerHTML = '🕴️ 체형 분석';
-    }
-}
-
-// ==========================================
-// 체형 분석 (고도화)
-// ==========================================
-
-function analyzeBodyType(pose) {
-    const keypoints = pose.keypoints;
-
-    // MoveNet keypoint 인덱스
-    // 5: left_shoulder, 6: right_shoulder
-    // 11: left_hip, 12: right_hip
-    // 13: left_knee, 14: right_knee
-    const leftShoulder = keypoints[5];
-    const rightShoulder = keypoints[6];
-    const leftHip = keypoints[11];
-    const rightHip = keypoints[12];
-
-    // 신뢰도 체크
-    const minScore = 0.5;
-    if (leftShoulder.score < minScore || rightShoulder.score < minScore ||
-        leftHip.score < minScore || rightHip.score < minScore) {
-        return {
-            type: '포즈를 정확히 인식할 수 없습니다. 전신이 보이도록 서주세요.',
-            key: null
-        };
-    }
-
-    // 치수 계산
-    const shoulderWidth = Math.abs(rightShoulder.x - leftShoulder.x);
-    const hipWidth = Math.abs(rightHip.x - leftHip.x);
-
-    // 허리 위치 추정 (어깨와 골반 사이)
-    const shoulderMidY = (leftShoulder.y + rightShoulder.y) / 2;
-    const hipMidY = (leftHip.y + rightHip.y) / 2;
-    const torsoHeight = Math.abs(hipMidY - shoulderMidY);
-
-    // 비율 계산
-    const shoulderHipRatio = shoulderWidth / hipWidth;
-
-    // 체형 판별 로직 (5가지 체형)
-    let bodyType = '';
-    let bodyKey = '';
-
-    if (shoulderHipRatio > 1.15) {
-        // 역삼각형: 어깨 > 골반
-        bodyType = '역삼각형 체형 (Inverted Triangle)';
-        bodyKey = 'inverted_triangle';
-    } else if (shoulderHipRatio < 0.9) {
-        // 삼각형: 골반 > 어깨
-        bodyType = '삼각형 체형 (Triangle/Pear)';
-        bodyKey = 'triangle';
-    } else if (shoulderHipRatio >= 0.95 && shoulderHipRatio <= 1.05) {
-        // 어깨와 골반이 거의 같음
-        // 허리 비율로 모래시계/직사각형 구분 (실제로는 허리 측정이 필요하지만 근사치 사용)
-        const waistRatio = torsoHeight / shoulderWidth;
-
-        if (waistRatio > 1.2) {
-            bodyType = '모래시계 체형 (Hourglass)';
-            bodyKey = 'hourglass';
-        } else {
-            bodyType = '직사각형 체형 (Rectangle)';
-            bodyKey = 'rectangle';
-        }
-    } else {
-        // 기본값
-        bodyType = '직사각형 체형 (Rectangle)';
-        bodyKey = 'rectangle';
-    }
-
-    return { type: bodyType, key: bodyKey };
 }
 
 // ==========================================
@@ -1135,52 +713,12 @@ function rgbToLab(r, g, b) {
 // 결과 표시
 // ==========================================
 
-function displayResults(bodyResult, colorResult) {
-    // 체형 결과
-    bodyResultEl.textContent = bodyResult.type;
-
-    // 퍼스널 컬러 결과
-    colorResultEl.textContent = colorResult.type;
-
-    // 컬러 팔레트 표시
-    colorPaletteEl.innerHTML = '';
-    if (colorResult.key && STYLE_DATABASE.personalColors[colorResult.key]) {
-        const colorData = STYLE_DATABASE.personalColors[colorResult.key];
-        colorData.palette.forEach((color, index) => {
-            const swatch = document.createElement('div');
-            swatch.className = 'color-swatch';
-            swatch.style.backgroundColor = color;
-            swatch.title = colorData.colorNames[index];
-            colorPaletteEl.appendChild(swatch);
-        });
-    }
-
-    // 스타일 추천 표시
-    displayStyleRecommendations(bodyResult.key, colorResult.key);
-
-    // 공유 카드 업데이트
-    updateShareCard(bodyResult, colorResult);
-
-    resultsEl.classList.remove('hidden');
-
-    // 결과로 스크롤
-    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
 // 공유 카드 업데이트
-function updateShareCard(bodyResult, colorResult) {
-    const shareBodyResult = document.getElementById('share-body-result');
+function updateShareCard(colorResult) {
     const shareColorResult = document.getElementById('share-color-result');
     const sharePalette = document.getElementById('share-palette');
 
-    if (shareBodyResult) {
-        // 체형 이름만 추출 (괄호 앞부분)
-        const bodyName = bodyResult.type ? bodyResult.type.split('(')[0].trim() : '-';
-        shareBodyResult.textContent = bodyName;
-    }
-
     if (shareColorResult) {
-        // 퍼스널 컬러 이름만 추출 (괄호 앞부분)
         const colorName = colorResult.type ? colorResult.type.split('(')[0].trim() : '-';
         shareColorResult.textContent = colorName;
     }
@@ -1197,36 +735,12 @@ function updateShareCard(bodyResult, colorResult) {
     }
 }
 
-function displayStyleRecommendations(bodyKey, colorKey) {
+function displayStyleRecommendations(colorKey) {
     if (!styleRecommendEl) return;
 
-    let html = '';
-
-    // 체형별 스타일 추천
-    if (bodyKey && STYLE_DATABASE.bodyTypes[bodyKey]) {
-        const bodyData = STYLE_DATABASE.bodyTypes[bodyKey];
-        html += `
-            <div class="recommend-section">
-                <h4>${bodyData.icons.join(' ')} ${bodyData.name} 체형 스타일링</h4>
-                <p class="description">${bodyData.description}</p>
-                <div class="recommend-list">
-                    <strong>추천 스타일:</strong>
-                    <ul>
-                        ${bodyData.recommendations.map(r => `<li>${r}</li>`).join('')}
-                    </ul>
-                </div>
-                <div class="avoid-list">
-                    <strong>피해야 할 스타일:</strong>
-                    <span class="avoid-tags">${bodyData.avoid.map(a => `<span class="avoid-tag">${a}</span>`).join('')}</span>
-                </div>
-            </div>
-        `;
-    }
-
-    // 퍼스널 컬러별 추천
     if (colorKey && STYLE_DATABASE.personalColors[colorKey]) {
         const colorData = STYLE_DATABASE.personalColors[colorKey];
-        html += `
+        styleRecommendEl.innerHTML = `
             <div class="recommend-section">
                 <h4>${colorData.icons.join(' ')} ${colorData.name} 컬러 스타일링</h4>
                 <p class="description">${colorData.description}</p>
@@ -1248,9 +762,9 @@ function displayStyleRecommendations(bodyKey, colorKey) {
                 </div>
             </div>
         `;
+    } else {
+        styleRecommendEl.innerHTML = '<p>분석 결과를 바탕으로 스타일 추천을 생성할 수 없습니다.</p>';
     }
-
-    styleRecommendEl.innerHTML = html || '<p>분석 결과를 바탕으로 스타일 추천을 생성할 수 없습니다.</p>';
 }
 
 // ==========================================
@@ -1270,13 +784,8 @@ if (switchCameraBtn) {
     switchCameraBtn.addEventListener('click', switchCamera);
 }
 
-// 단계별 분석 버튼
 if (colorAnalyzeBtn) {
     colorAnalyzeBtn.addEventListener('click', analyzeColor);
-}
-
-if (bodyAnalyzeBtn) {
-    bodyAnalyzeBtn.addEventListener('click', analyzeBody);
 }
 
 // 다시 측정하기 버튼
@@ -1286,22 +795,17 @@ if (resetBtn) {
         // 결과 숨기기
         resultsEl.classList.add('hidden');
 
-        // 분석 상태 초기화
-        analysisStep = 0;
         savedColorResult = null;
-        savedBodyResult = null;
-
-        // 자동 분석 변수 초기화
         faceDetectionCount = 0;
-        poseDetectionCount = 0;
         isAutoAnalyzing = false;
 
-        // UI 초기화
-        updateStepUI();
+        colorAnalyzeBtn.disabled = false;
+        colorAnalyzeBtn.classList.remove('completed');
+        colorAnalyzeBtn.innerHTML = '🎨 퍼스널 컬러 분석';
+        if (stepTextEl) stepTextEl.textContent = '얼굴이 잘 보이도록 카메라를 바라봐주세요';
 
-        // 얼굴 감지 재시작 (1단계로 돌아가기)
         if (isStreaming) {
-            startDetection();
+            detectFace();
         }
 
         // 스타일 추천 초기화
@@ -1354,10 +858,9 @@ if (downloadBtn) {
 const twitterBtn = document.getElementById('twitter-btn');
 if (twitterBtn) {
     twitterBtn.addEventListener('click', () => {
-        const bodyText = document.getElementById('share-body-result')?.textContent || '';
         const colorText = document.getElementById('share-color-result')?.textContent || '';
 
-        const text = `AI 스타일 코치 분석 결과!\n\n체형: ${bodyText}\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기 👇`;
+        const text = `AI 스타일 코치 분석 결과!\n\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기 👇`;
         const url = encodeURIComponent(SITE_URL);
         const tweetText = encodeURIComponent(text);
 
@@ -1378,16 +881,14 @@ if (facebookBtn) {
 const kakaoBtn = document.getElementById('kakao-btn');
 if (kakaoBtn) {
     kakaoBtn.addEventListener('click', () => {
-        const bodyText = document.getElementById('share-body-result')?.textContent || '';
         const colorText = document.getElementById('share-color-result')?.textContent || '';
 
-        // 카카오 SDK가 없으면 클립보드 복사로 대체
         if (typeof Kakao !== 'undefined' && Kakao.isInitialized()) {
             Kakao.Share.sendDefault({
                 objectType: 'feed',
                 content: {
                     title: 'AI 스타일 코치 분석 결과',
-                    description: `체형: ${bodyText} / 퍼스널 컬러: ${colorText}`,
+                    description: `퍼스널 컬러: ${colorText}`,
                     imageUrl: 'https://re-spring.pages.dev/og-image.png',
                     link: {
                         mobileWebUrl: SITE_URL,
@@ -1405,8 +906,7 @@ if (kakaoBtn) {
                 ]
             });
         } else {
-            // 카카오 SDK 없으면 링크 복사
-            const shareText = `AI 스타일 코치 분석 결과!\n체형: ${bodyText}\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기: ${SITE_URL}`;
+            const shareText = `AI 스타일 코치 분석 결과!\n퍼스널 컬러: ${colorText}\n\n나도 분석해보기: ${SITE_URL}`;
 
             navigator.clipboard.writeText(shareText).then(() => {
                 alert('공유 내용이 클립보드에 복사되었습니다!\n카카오톡에 붙여넣기 해주세요.');

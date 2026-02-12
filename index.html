@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-adsense-account" content="ca-pub-5144337054472639">
-    <meta name="description" content="AI 스타일 코치 - 인공지능이 분석하는 체형과 퍼스널 컬러. TensorFlow.js 기반으로 브라우저에서 안전하게 분석하고 맞춤 스타일을 추천받으세요.">
-    <meta name="keywords" content="퍼스널컬러, 체형분석, AI스타일, 패션추천, 퍼스널컬러진단, 체형진단, 스타일추천">
+    <meta name="description" content="AI 스타일 코치 - 인공지능이 분석하는 퍼스널 컬러. TensorFlow.js 기반으로 브라우저에서 안전하게 분석하고 맞춤 스타일을 추천받으세요.">
+    <meta name="keywords" content="퍼스널컬러, AI스타일, 패션추천, 퍼스널컬러진단, 스타일추천">
     <meta name="author" content="AI 스타일 코치">
     <meta name="robots" content="index, follow">
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="AI 스타일 코치 - 체형 & 퍼스널 컬러 분석">
+    <meta property="og:title" content="AI 스타일 코치 - 퍼스널 컬러 분석">
     <meta property="og:description" content="인공지능이 분석하는 체형과 퍼스널 컬러. 무료로 맞춤 스타일 추천을 받아보세요.">
     <meta property="og:url" content="https://re-spring.pages.dev">
     <meta property="og:site_name" content="AI 스타일 코치">
@@ -21,11 +21,11 @@
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="AI 스타일 코치 - 체형 & 퍼스널 컬러 분석">
+    <meta name="twitter:title" content="AI 스타일 코치 - 퍼스널 컬러 분석">
     <meta name="twitter:description" content="인공지능이 분석하는 체형과 퍼스널 컬러. 무료로 맞춤 스타일 추천을 받아보세요.">
     <meta name="twitter:image" content="https://re-spring.pages.dev/og-image.png">
 
-    <title>AI 스타일 코치 - 체형 & 퍼스널 컬러 분석</title>
+    <title>AI 스타일 코치 - 퍼스널 컬러 분석</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/pages.css">
 
@@ -46,7 +46,7 @@
 
         <header>
             <h1>AI 스타일 코치</h1>
-            <p>체형 & 퍼스널 컬러 분석</p>
+            <p>퍼스널 컬러 분석</p>
         </header>
 
         <main>
@@ -68,28 +68,20 @@
                 <button id="switch-camera-btn" class="btn btn-secondary hidden">📷 카메라 전환</button>
             </div>
 
-            <!-- 단계별 분석 버튼 -->
+            <!-- 분석 버튼 -->
             <div class="step-controls hidden" id="step-controls">
                 <div class="step-info">
-                    <span class="step-badge" id="current-step">1단계</span>
                     <span class="step-text" id="step-text">얼굴이 잘 보이도록 카메라를 바라봐주세요</span>
                 </div>
                 <div class="step-buttons">
                     <button id="color-analyze-btn" class="btn btn-step btn-color" disabled>
                         🎨 퍼스널 컬러 분석
                     </button>
-                    <button id="body-analyze-btn" class="btn btn-step btn-body" disabled>
-                        🕴️ 체형 분석
-                    </button>
                 </div>
             </div>
 
             <!-- 분석 결과 -->
             <div id="results" class="results hidden">
-                <div class="result-card">
-                    <h3>체형 분석</h3>
-                    <p id="body-result">-</p>
-                </div>
                 <div class="result-card">
                     <h3>퍼스널 컬러</h3>
                     <p id="color-result">-</p>
@@ -109,10 +101,6 @@
                         <p>나의 스타일 분석 결과</p>
                     </div>
                     <div class="share-card-body">
-                        <div class="share-result-item">
-                            <span class="share-label">체형</span>
-                            <span id="share-body-result" class="share-value">-</span>
-                        </div>
                         <div class="share-result-item">
                             <span class="share-label">퍼스널 컬러</span>
                             <span id="share-color-result" class="share-value">-</span>
@@ -160,8 +148,6 @@
 
     <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
-    <!-- Pose Detection (MoveNet) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
     <!-- Face Landmarks Detection -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.5/dist/face-landmarks-detection.min.js"></script>
     <!-- html2canvas for image capture -->
